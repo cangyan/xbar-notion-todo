@@ -13,6 +13,33 @@
 import http.client
 import json
 import os
+from datetime import date, datetime
+
+
+class DisplayItem:
+    def __init__(self, title="", body="", status="", end="") -> None:
+        self.title = title
+        self.body = body
+        self.status = status
+        self.end = end
+
+    def getEmoji(self):
+        if self.status == "进行中":
+            return ":construction:"
+        if self.status == "准备进行":
+            return ":rocket:"
+        return ""
+
+    def getEndTips(self):
+        if self.end != "":
+            endTime = datetime.strptime(self.end, "%Y-%m-%d")
+            return "〆"+endTime.month.__str__()+"/"+endTime.day.__str__()
+        return ""
+
+    def to_display(self):
+        print(self.getEmoji() + " " + self.getEndTips() + " " + self.title)
+        print("----")
+        print(self.body)
 
 
 def printTodo(todo=""):
@@ -22,11 +49,17 @@ def printTodo(todo=""):
 conn = http.client.HTTPSConnection("api.notion.com")
 payload = json.dumps({
     "filter": {
-        "and": [
+        "or": [
             {
                 "property": "Status",
                 "select": {
                     "equals": "进行中"
+                }
+            },
+            {
+                "property": "Status",
+                "select": {
+                    "equals": "准备进行"
                 }
             }
         ]
@@ -49,28 +82,53 @@ j = json.loads(data.decode("utf-8"))
 #############################################################################
 
 showTitle = ""
-showBody = ""
+doingList = []
+planList = []
 
 
 if len(j["results"]) > 0:
     for item in j["results"]:
-        showTitle = item["properties"]["Name"]["title"][0]["text"]["content"]
+        if showTitle == "" and item["properties"]["Status"]["select"]["name"] == "进行中":
+            showTitle = item["properties"]["Name"]["title"][0]["text"]["content"]
+
+        showBody = ""
         if len(item["properties"]["Tag"]["multi_select"]) > 0:
             showBody += "--"
             for tag in item["properties"]["Tag"]["multi_select"]:
                 showBody += "["+tag["name"]+"] "
-            showBody += "\r\n"
-        if item["properties"]["tapd"]["url"]:
 
-            showBody += "--" + item["properties"]["tapd"]["url"] + "\r\n"
-        if item["properties"]["Date"]["date"]["start"] and item["properties"]["Date"]["date"]["end"]:
-            showBody += "--" + item["properties"]["Date"]["date"]["start"] + \
+        if item["properties"]["tapd"]["url"] is not None:
+            showBody += "\r\n"
+            showBody += "--"
+            showBody += item["properties"]["tapd"]["url"]
+
+        end = ""
+        if item["properties"]["Date"]["date"] is not None:
+            end = item["properties"]["Date"]["date"]["end"]
+            showBody += "\r\n"
+            showBody += "--"
+            showBody += item["properties"]["Date"]["date"]["start"] + \
                 " - " + item["properties"]["Date"]["date"]["end"]
 
-        break
+        if item["properties"]["Status"]["select"]["name"] == "进行中":
+            doingList.append(DisplayItem(item["properties"]["Name"]["title"][0]["text"]
+                             ["content"], showBody, item["properties"]["Status"]["select"]["name"], end))
+        if item["properties"]["Status"]["select"]["name"] == "准备进行":
+            planList.append(DisplayItem(item["properties"]["Name"]["title"][0]["text"]
+                            ["content"], showBody, item["properties"]["Status"]["select"]["name"], end))
+
 
 printTodo(showTitle)
 print("---")
-print(showTitle + "| size=14")
-print("----")
-print(showBody)
+if len(doingList) == 0:
+    print(":tada: 没有进行中的TODO")
+for item in doingList:
+    if item is not None:
+        item.to_display()
+
+print("---")
+if len(planList) == 0:
+    print(":coffee: 没有待进行的TODO")
+for item in planList:
+    if item is not None:
+        item.to_display()
