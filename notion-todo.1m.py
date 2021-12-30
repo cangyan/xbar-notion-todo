@@ -100,7 +100,7 @@ if len(j["results"]) > 0:
         if item["properties"]["tapd"]["url"] is not None:
             showBody += "\r\n"
             showBody += "--"
-            showBody += item["properties"]["tapd"]["url"]
+            showBody += "点击打开Tapd | href=" + item["properties"]["tapd"]["url"]
 
         end = ""
         if item["properties"]["Date"]["date"] is not None:
